@@ -1,0 +1,19 @@
+Train:
+  batch_size: 32
+  learning_rate: 0.00001
+  epochs: 40
+
+network:
+  model: VisionTransformer
+  d_model: 512 
+  nhead: 4 
+  dim_feedforward: 2048 
+  num_layers: 1
+  dropout: 0.1
+
+data:
+  beta: .9999999
+  weight_decay: 0.000001
+
+loss:
+  loss_type: CE
