@@ -16,6 +16,7 @@ import torch.nn as nn
 from os import listdir
 from torch.utils.data import DataLoader
 from models.VisionTransformer import ImageTransformer
+from utils import ChessboardDataset
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description='Chess-Vision')
@@ -35,7 +36,12 @@ if __name__ ==  '__main__':
     print(f'Device type: {device}')
 
     # data
-    # TODO: set up dataset
+    train_data_dir = '/data/train'
+    test_data_dir = '/data/test'
+
+    train_dataset = ChessboardDataset(data_dir=train_data_dir)
+    test_dataset = ChessboardDataset(data_dir=test_data_dir)
+
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
 
