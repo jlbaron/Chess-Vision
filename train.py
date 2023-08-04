@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from models.VisionTransformer import ImageTransformer
 import matplotlib.pyplot as plt
 
-parser = argparse.ArgumentParser(description='DL-Project')
+parser = argparse.ArgumentParser(description='Chess-Vision')
 parser.add_argument('--config', default='./config.yaml')
 
 if __name__ ==  '__main__':
@@ -66,9 +66,6 @@ if __name__ ==  '__main__':
         batch_accuracies = []
         model.train()
         for idx, (images, labels) in enumerate(train_loader):
-            # videos (batch size x rgb x frames x height x width)
-            # labels (batch size x num_classes)
-
             # put on device
             images = videos.to(device)
             labels = labels.to(device)
@@ -102,9 +99,6 @@ if __name__ ==  '__main__':
         model.eval()
         with torch.no_grad():
             for idx, (videos, labels) in enumerate(test_loader):
-                # videos (batch size x rgb x frames x height x width)
-                # labels (batch size x num_classes)
-
                 # enable gpu
                 videos = videos.to(device)
                 labels = labels.to(device)
