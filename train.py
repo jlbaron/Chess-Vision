@@ -1,12 +1,6 @@
 '''
 Script to load data and train model
 '''
-'''
-A one-shot python script version of our main.ipynb
-Mostly configured for Transformer training
-Run with: python --config configs/configs_ViViT.yaml
-or: python --config configs/configs_ViT.yaml
-'''
 
 import yaml
 import argparse
@@ -16,7 +10,7 @@ import torch.nn as nn
 from os import listdir
 from torch.utils.data import DataLoader
 from models.VisionTransformer import ImageTransformer
-from utils import ChessboardDataset
+from utils import ChessboardDataset, calculate_accuracy
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description='Chess-Vision')

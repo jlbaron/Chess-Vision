@@ -22,6 +22,7 @@ both of which are needed for 2-6 in the full FEN
 import os
 import numpy as np
 import re
+import torch
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 
@@ -37,7 +38,7 @@ class ChessboardDataset(Dataset):
         img_name = os.path.join(self.data_dir, self.image_list[idx])
         image = Image.open(img_name).convert("RGB")
         label = int(self.image_list[idx].split('.')[0].split('label')[1])
-
+        label = onehot_from_fen(label)
         return image, label
 
 #rely on https://www.kaggle.com/code/koryakinp/chess-fen-generator/notebook
@@ -80,3 +81,10 @@ def fen_from_onehot(one_hot):
         output = output.replace(' ' * i, str(i))
 
     return output
+
+def calculate_accuracy(predictions, labels):
+    _, predicted_classes = torch.max(predictions, 1)
+    correct_predictions = (predicted_classes == labels).sum().item()
+    total_predictions = labels.size(0)
+    accuracy = correct_predictions / total_predictions
+    return accuracy
