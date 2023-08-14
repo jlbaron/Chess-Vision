@@ -23,6 +23,7 @@ import os
 import numpy as np
 import re
 import torch
+import torchvision
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 
@@ -35,9 +36,13 @@ class ChessboardDataset(Dataset):
         return len(self.image_list)
 
     def __getitem__(self, idx):
+        # This process needs to change
+        # Retrieving the image is bugged and the label is likely incorrect
+        # Although the label tools were given with the dataset, I would like to try just a straight ce loss on the label as is
         img_name = os.path.join(self.data_dir, self.image_list[idx])
         image = Image.open(img_name).convert("RGB")
-        label = int(self.image_list[idx].split('.')[0].split('label')[1])
+        image = torchvision.Image(img_name) #idk i need the internet
+        label = self.image_list[idx].split('.')[0]
         label = onehot_from_fen(label)
         return image, label
 
