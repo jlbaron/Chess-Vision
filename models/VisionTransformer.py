@@ -7,9 +7,9 @@ import torch.nn.functional as F
 import math
 
 
-class ImagePatchEncoder(nn.Module):
+class ImageSquareEncoder(nn.Module):
     def __init__(self, d_model, patch_size=50, num_patches=64, channels=3, device='cpu'):
-        super(ImagePatchEncoder, self).__init__()
+        super(ImageSquareEncoder, self).__init__()
         self.patch_size = patch_size
         self.num_patches = num_patches
 
@@ -52,6 +52,42 @@ class ImagePatchEncoder(nn.Module):
 
         return x
     
+class ImagePatchEncoder(nn.Module):
+    def __init__(self, d_model, patch_size=20, num_patches=400, channels=3, device='cpu'):
+        super(ImagePatchEncoder, self).__init__()
+        self.patch_size = patch_size
+        self.num_patches = num_patches
+
+        # 400-20= 380/20 = 19+1 = 20
+        self.cnn = nn.Conv2d(channels, d_model, patch_size, patch_size)
+
+        # Create positional encoding for each patch
+        self.positional_encoding = self.create_positional_encoding(d_model, self.num_patches, device)
+
+    def create_positional_encoding(self, d_model, num_patches, device='cpu'):
+        # sine positional encoding
+
+        positional_encoding = torch.zeros(num_patches, d_model).to(device)
+        position = torch.arange(0, num_patches, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2, dtype=torch.float) * -(math.log(10000.0) / d_model))
+        positional_encoding[:, 0::2] = torch.sin(position * div_term)
+        positional_encoding[:, 1::2] = torch.cos(position * div_term)
+
+        return positional_encoding
+
+    def forward(self, x):
+        # Input x: (batch_size, height, width, channels)
+
+        # use a cnn to reduce x to d_modelx20x20
+        x = self.cnn(x)
+        x = x.flatten(2)
+        x = x.permute(0, 2, 1)
+
+        # Add positional encoding to each patch
+        x = x + self.positional_encoding
+
+        return x
+    
 class ImageTransformer(nn.Module):
     def __init__(self, d_model=512, nhead=4, num_layers=1, dim_feedforward=2048, dropout=0.1, device='cpu'):
         super(ImageTransformer, self).__init__()
@@ -60,7 +96,7 @@ class ImageTransformer(nn.Module):
 
         encoder_layer = nn.TransformerEncoderLayer( d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout, device=device)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.cls_token_emb = nn.Parameter(torch.zeros(1, 1, d_model), requires_grad=True)
+        self.cls_token_emb = nn.Parameter(torch.zeros(1, 1, d_model), requires_grad=False)
 
     def normalize_image(self, image_batch):
             image_batch = image_batch.float() / 255.0

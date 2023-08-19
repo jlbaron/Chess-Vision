@@ -25,12 +25,12 @@ import re
 import torch
 import torchvision
 from torch.utils.data import Dataset, DataLoader
-from PIL import Image
 
 class ChessboardDataset(Dataset):
     def __init__(self, data_dir):
         self.data_dir = data_dir
         self.image_list = [filename for filename in os.listdir(data_dir) if filename.endswith('.jpeg')]
+        self.max_len = max(len(filename.split('.')[0]) for filename in self.image_list)
 
     def __len__(self):
         return len(self.image_list)
@@ -40,10 +40,12 @@ class ChessboardDataset(Dataset):
         # Retrieving the image is bugged and the label is likely incorrect
         # Although the label tools were given with the dataset, I would like to try just a straight ce loss on the label as is
         img_name = os.path.join(self.data_dir, self.image_list[idx])
-        image = Image.open(img_name).convert("RGB")
-        image = torchvision.Image(img_name) #idk i need the internet
+        image = torchvision.io.read_image(img_name) #idk i need the internet
         label = self.image_list[idx].split('.')[0]
-        label = onehot_from_fen(label)
+        label = [ord(char) for char in label]  # Convert characters to ASCII values
+        label = torch.tensor(label, dtype=torch.int32)
+        pad_value = 0
+        label = torch.cat([label, torch.tensor([pad_value] * (self.max_len - len(label)))])
         return image, label
 
 #rely on https://www.kaggle.com/code/koryakinp/chess-fen-generator/notebook

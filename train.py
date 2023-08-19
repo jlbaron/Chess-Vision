@@ -14,13 +14,13 @@ from utils import ChessboardDataset, calculate_accuracy
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description='Chess-Vision')
-parser.add_argument('--config', default='./config.yaml')
+parser.add_argument('--config', default='.\\configs\\config_VisionTransformer.yaml')
 
 if __name__ ==  '__main__':
     global args
     args = parser.parse_args()
     with open(args.config) as f:
-        config = yaml.load(f)
+        config = yaml.safe_load(f)
     
     for key in config:
         for k, v in config[key].items():
@@ -30,8 +30,8 @@ if __name__ ==  '__main__':
     print(f'Device type: {device}')
 
     # data
-    train_data_dir = '/data/train'
-    test_data_dir = '/data/test'
+    train_data_dir = 'data/train'
+    test_data_dir = 'data/test'
 
     train_dataset = ChessboardDataset(data_dir=train_data_dir)
     test_dataset = ChessboardDataset(data_dir=test_data_dir)
@@ -41,7 +41,7 @@ if __name__ ==  '__main__':
 
     # model
     if args.model == "VisionTransformer":
-        model = ImageTransformer(d_model=args.d_model, nhead=args.nhead, dim_feedforward=args.dim_feedforward, dropout=args.dropout, num_layers=args.num_layers, num_classes=args.num_classes, ispool=args.ispool, device=device).to(device)
+        model = ImageTransformer(d_model=args.d_model, nhead=args.nhead, dim_feedforward=args.dim_feedforward, dropout=args.dropout, num_layers=args.num_layers, device=device).to(device)
     else:
         raise Exception("Invalid model")
 
@@ -54,25 +54,24 @@ if __name__ ==  '__main__':
         raise Exception("Invalid loss")
 
 
-    # source used as reference: https://medium.com/analytics-vidhya/creating-a-custom-dataset-and-dataloader-in-pytorch-76f210a1df5d
     train_losses = []
     train_accuracies = []
     val_losses = []
     val_accuracies = []
     for epoch in range(args.epochs):
         # training loop
-        # source used as reference: assignment 2 boilerplate
         batch_losses = []
         batch_accuracies = []
         model.train()
         for idx, (images, labels) in enumerate(train_loader):
             # put on device
-            images = videos.to(device)
+            images = images.to(device)
             labels = labels.to(device)
+            print(labels.shape)
 
             # perform forward pass
             optimizer.zero_grad()
-            predictions = model(videos)
+            predictions = model(images)
 
             # backward pass
             loss = criterion(predictions, labels)
@@ -80,7 +79,7 @@ if __name__ ==  '__main__':
             optimizer.step()
             
             # calculate accuracy
-
+            batch_accuracy = calculate_accuracy(predictions, labels)
             batch_losses.append(loss.item())
             batch_accuracies.append(batch_accuracy)
 
@@ -98,13 +97,13 @@ if __name__ ==  '__main__':
         all_labels = None
         model.eval()
         with torch.no_grad():
-            for idx, (videos, labels) in enumerate(test_loader):
+            for idx, (images, labels) in enumerate(test_loader):
                 # enable gpu
-                videos = videos.to(device)
+                images = images.to(device)
                 labels = labels.to(device)
 
                 # perform forward pass
-                predictions = model(videos)
+                predictions = model(images)
                 loss = criterion(predictions, labels)
                 
                 
