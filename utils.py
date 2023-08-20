@@ -90,8 +90,6 @@ def fen_from_onehot(one_hot):
     return output
 
 def calculate_accuracy(predictions, labels):
-    _, predicted_classes = torch.max(predictions, 1)
-    correct_predictions = (predicted_classes == labels).sum().item()
-    total_predictions = labels.size(0)
-    accuracy = correct_predictions / total_predictions
+    correct_predictions = (predictions == labels).sum().item()
+    accuracy = correct_predictions / labels.shape[1]
     return accuracy

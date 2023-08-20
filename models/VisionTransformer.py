@@ -89,7 +89,7 @@ class ImagePatchEncoder(nn.Module):
         return x
     
 class ImageTransformer(nn.Module):
-    def __init__(self, d_model=512, nhead=4, num_layers=1, dim_feedforward=2048, dropout=0.1, device='cpu'):
+    def __init__(self, d_model=512, nhead=4, num_layers=1, dim_feedforward=2048, dropout=0.1, max_len=45, device='cpu'):
         super(ImageTransformer, self).__init__()
 
         self.embedding = ImagePatchEncoder(d_model=d_model, device=device)
@@ -97,6 +97,7 @@ class ImageTransformer(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer( d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout, device=device)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.cls_token_emb = nn.Parameter(torch.zeros(1, 1, d_model), requires_grad=False)
+        self.linear = nn.Linear(d_model, max_len)
 
     def normalize_image(self, image_batch):
             image_batch = image_batch.float() / 255.0
@@ -105,7 +106,8 @@ class ImageTransformer(nn.Module):
         x = self.normalize_image(x)
         x = self.embedding(x)
         x = self.transformer_encoder(x)
-        cls_token_emb = self.cls_token_emb.expand(-1, x.shape[1], -1)
-        x = torch.cat([cls_token_emb, x]) #prepend CLS
-        x = x[0] #extract CLS
+        cls_token_emb = self.cls_token_emb.expand(x.shape[0], 1, -1)
+        x = torch.cat([cls_token_emb, x], dim=1) #prepend CLS
+        x = x[:, 0, :] #extract CLS
+        x = self.linear(x)
         return x

@@ -67,14 +67,13 @@ if __name__ ==  '__main__':
             # put on device
             images = images.to(device)
             labels = labels.to(device)
-            print(labels.shape)
 
             # perform forward pass
             optimizer.zero_grad()
             predictions = model(images)
 
             # backward pass
-            loss = criterion(predictions, labels)
+            loss = criterion(predictions, labels.to(torch.float))
             loss.backward()
             optimizer.step()
             
