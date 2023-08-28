@@ -16,6 +16,68 @@ import matplotlib.pyplot as plt
 parser = argparse.ArgumentParser(description='Chess-Vision')
 parser.add_argument('--config', default='.\\configs\\config_VisionTransformer.yaml')
 
+def train(model, train_loader, optimizer, criterion, device):
+    total_loss = 0.
+    total_acc = 0.
+    model.train()
+    for idx, (images, labels) in enumerate(train_loader):
+        # put on device
+        images = images.to(device)
+        labels = labels.to(device)
+
+        # perform forward pass
+        optimizer.zero_grad()
+        predictions = model(images)
+
+        # backward pass
+        loss = criterion(predictions, labels.to(torch.float))
+        loss.backward()
+        optimizer.step()
+        
+        # calculate accuracy
+        total_loss += loss.item()
+        acc = calculate_accuracy(predictions, labels)
+        total_acc += acc
+        print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}")
+    return model, total_loss / len(train_loader), total_acc / len(train_loader)
+
+def evaluate(model, val_loader, criterion, device):
+    model.eval()
+
+    total_loss = 0.
+    total_acc = 0.
+    with torch.no_grad():
+        for idx, (images, labels) in enumerate(val_loader):
+            # enable gpu
+            images = images.to(device)
+            labels = labels.to(device)
+
+            # perform forward pass
+            predictions = model(images)
+            loss = criterion(predictions, labels)
+            
+            total_loss += loss.item()
+            acc = calculate_accuracy(predictions, labels)
+            total_acc += acc
+            print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}")
+    return total_loss / len(val_loader), total_acc / (len(val_loader))
+
+def plot_curves(train_losses, train_accuracies, val_losses, val_accuracies):
+    plt.plot(train_losses, label="Training Loss")
+    plt.plot(val_losses, label="Validation Loss")
+    plt.title("Training and Validation Loss")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.savefig("loss.png")
+    plt.show()
+    plt.plot(train_accuracies, label="Training Accuracies")
+    plt.plot(val_accuracies, label="Validation Accuracies")
+    plt.title("Training and Validation Accuracy")
+    plt.xlabel("Epochs")
+    plt.ylabel("Accuracy")
+    plt.savefig("acc.png")
+    plt.show()
+
 if __name__ ==  '__main__':
     global args
     args = parser.parse_args()
@@ -31,13 +93,13 @@ if __name__ ==  '__main__':
 
     # data
     train_data_dir = 'data/train'
-    test_data_dir = 'data/test'
+    val_data_dir = 'data/test'
 
     train_dataset = ChessboardDataset(data_dir=train_data_dir)
-    test_dataset = ChessboardDataset(data_dir=test_data_dir)
+    val_dataset = ChessboardDataset(data_dir=val_data_dir)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
 
     # model
     if args.model == "VisionTransformer":
@@ -59,84 +121,13 @@ if __name__ ==  '__main__':
     val_losses = []
     val_accuracies = []
     for epoch in range(args.epochs):
-        # training loop
-        batch_losses = []
-        batch_accuracies = []
-        model.train()
-        for idx, (images, labels) in enumerate(train_loader):
-            # put on device
-            images = images.to(device)
-            labels = labels.to(device)
-
-            # perform forward pass
-            optimizer.zero_grad()
-            predictions = model(images)
-
-            # backward pass
-            loss = criterion(predictions, labels.to(torch.float))
-            loss.backward()
-            optimizer.step()
-            
-            # calculate accuracy
-            batch_accuracy = calculate_accuracy(predictions, labels)
-            batch_losses.append(loss.item())
-            batch_accuracies.append(batch_accuracy)
-
-
-        avg_train_loss = sum(batch_losses) / len(batch_losses)
-        avg_train_acc = sum(batch_accuracies) / len(batch_accuracies)
-        train_losses.append(avg_train_loss)
-        train_accuracies.append(avg_train_acc)
-        
-        # validation loop
-        # source used as reference: assignment 2 boilerplate
-        val_batch_losses = []
-        val_batch_accuracies = []
-        all_predictions = None
-        all_labels = None
-        model.eval()
-        with torch.no_grad():
-            for idx, (images, labels) in enumerate(test_loader):
-                # enable gpu
-                images = images.to(device)
-                labels = labels.to(device)
-
-                # perform forward pass
-                predictions = model(images)
-                loss = criterion(predictions, labels)
-                
-                
-                # calculate accuracy
-                batch_accuracy = calculate_accuracy(predictions, labels)
-
-
-                # append to loop variables
-                val_batch_losses.append(loss.item())
-                val_batch_accuracies.append(batch_accuracy)
-                all_predictions = predictions if all_predictions is None else torch.cat((all_predictions, predictions), 0)
-                all_labels = labels if all_labels is None else torch.cat((all_labels, labels), 0)
-
-
-        avg_val_loss = sum(val_batch_losses) / len(val_batch_losses)
-        avg_val_acc = sum(val_batch_accuracies) / len(val_batch_accuracies)
-        val_losses.append(avg_val_loss)
-        val_accuracies.append(avg_val_acc)
-
-        print(f"--------EPOCH {epoch+1}, TRAIN LOSS: {avg_train_loss}, TRAIN ACC: {avg_train_acc}, VAL LOSS: {avg_val_loss}, VAL ACC: {avg_val_acc}---------")
+        model, train_loss, train_acc = train(model, train_loader, optimizer, criterion, device)
+        model, val_loss, val_acc = evaluate(model, val_loader, criterion, device)
+        train_losses.append(train_loss)
+        train_accuracies.append(train_acc)
+        val_losses.append(val_loss)
+        val_accuracies.append(val_acc)
+        print(f"--------EPOCH {epoch+1}, TRAIN LOSS: {train_loss}, TRAIN ACC: {train_acc}, VAL LOSS: {val_loss}, VAL ACC: {val_acc}---------")
         print("---------------------------------------------------")
 
-    epochs_range = range(1, args.epochs+1)
-    plt.plot(train_losses, label="Training Loss")
-    plt.plot(val_losses, label="Validation Loss")
-    plt.title("Training and Validation Loss")
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.savefig("loss.png")
-    plt.show()
-    plt.plot(train_accuracies, label="Training Accuracies")
-    plt.plot(val_accuracies, label="Validation Accuracies")
-    plt.title("Training and Validation Accuracy")
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.savefig("acc.png")
-    plt.show()
+    plot_curves(train_losses, train_accuracies, val_losses, val_accuracies)
