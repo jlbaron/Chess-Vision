@@ -27,7 +27,7 @@ def train(model, train_loader, optimizer, criterion, device):
 
         # perform forward pass
         optimizer.zero_grad()
-        predictions = model(images)
+        predictions = model(images, labels)
 
         # backward pass
         loss = criterion(predictions, labels.to(torch.float))
@@ -103,7 +103,7 @@ if __name__ ==  '__main__':
 
     # model
     if args.model == "VisionTransformer":
-        model = ImageTransformer(d_model=args.d_model, nhead=args.nhead, dim_feedforward=args.dim_feedforward, dropout=args.dropout, num_layers=args.num_layers, device=device).to(device)
+        model = ImageTransformer(d_model=args.d_model, nhead=args.nhead, dim_feedforward=args.dim_feedforward, dropout=args.dropout, num_layers=args.num_layers, device=device, image_analysis=args.image_analysis).to(device)
     else:
         raise Exception("Invalid model")
 
@@ -129,5 +129,4 @@ if __name__ ==  '__main__':
         val_accuracies.append(val_acc)
         print(f"--------EPOCH {epoch+1}, TRAIN LOSS: {train_loss}, TRAIN ACC: {train_acc}, VAL LOSS: {val_loss}, VAL ACC: {val_acc}---------")
         print("---------------------------------------------------")
-
     plot_curves(train_losses, train_accuracies, val_losses, val_accuracies)

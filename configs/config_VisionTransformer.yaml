@@ -1,15 +1,18 @@
 Train:
-  batch_size: 32
+  batch_size: 128
   learning_rate: 0.00001
-  epochs: 40
+  epochs: 1
 
 network:
   model: VisionTransformer
   d_model: 512 
-  nhead: 4 
+  nhead: 8 
   dim_feedforward: 2048 
-  num_layers: 1
+  num_layers: 4
   dropout: 0.1
+
+debug:
+  image_analysis: False
 
 data:
   beta: .9999999

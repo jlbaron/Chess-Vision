@@ -14,10 +14,7 @@ rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
 and after e4:
 rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR
 
-I am not sure if any model can look at a random board and say:
-1) what the last move was
-2) how many moves have been played
-both of which are needed for 2-6 in the full FEN
+Will only use 1) pieces by rank since other parts are nearly impossible to determine
 '''
 import os
 import numpy as np
