@@ -23,11 +23,22 @@ import torch
 import torchvision
 from torch.utils.data import Dataset, DataLoader
 
+vocab = {
+    "0": 0,
+    "-": 1,
+    "p": 2, "P": 3,
+    "n": 4, "N": 5,
+    "b": 6, "B": 7,
+    "r": 8, "R": 9,
+    "q": 10, "Q": 11,
+    "k": 12, "K": 13
+}
+
 class ChessboardDataset(Dataset):
     def __init__(self, data_dir):
         self.data_dir = data_dir
         self.image_list = [filename for filename in os.listdir(data_dir) if filename.endswith('.jpeg')]
-        self.max_len = max(len(filename.split('.')[0]) for filename in self.image_list)
+        self.max_len = 71 # 8x8=64 + 7 dashes
 
     def __len__(self):
         return len(self.image_list)
@@ -37,56 +48,55 @@ class ChessboardDataset(Dataset):
         # Retrieving the image is bugged and the label is likely incorrect
         # Although the label tools were given with the dataset, I would like to try just a straight ce loss on the label as is
         img_name = os.path.join(self.data_dir, self.image_list[idx])
-        image = torchvision.io.read_image(img_name) #idk i need the internet
+        image = torchvision.io.read_image(img_name)
         label = self.image_list[idx].split('.')[0]
-        label = [ord(char) for char in label]  # Convert characters to ASCII values
-        label = torch.tensor(label, dtype=torch.int32)
-        pad_value = 0
-        label = torch.cat([label, torch.tensor([pad_value] * (self.max_len - len(label)))])
-        return image, label
-
-#rely on https://www.kaggle.com/code/koryakinp/chess-fen-generator/notebook
-#rely on https://www.kaggle.com/code/ananyaroy1011/chess-positions-fen-prediction-eda-cnn-model
-piece_symbols = 'prbnkqPRBNKQ'
-def fen_from_filename(filename):
-    base = os.path.basename(filename)
-    return os.path.splitext(base)[0]
-
-# convert fen to number for classification
-def onehot_from_fen(fen):
-    eye = np.eye(13)
-    output = np.empty((0, 13))
-    fen = re.sub('[-]', '', fen)
-
-    for char in fen:
-        if(char in '12345678'):
-            output = np.append(
-              output, np.tile(eye[12], (int(char), 1)), axis=0)
-        else:
-            idx = piece_symbols.index(char)
-            output = np.append(output, eye[idx].reshape((1, 13)), axis=0)
-
-    return output
-
-
-# convert transformer output to fen to pretty printing
-def fen_from_onehot(one_hot):
-    output = ''
-    for j in range(8):
-        for i in range(8):
-            if(one_hot[j][i] == 12):
-                output += ' '
+        expanded = ""
+        for i in label:
+            if i.isdigit():
+                for j in range(int(i)):
+                    expanded += "0"
             else:
-                output += piece_symbols[one_hot[j][i]]
-        if(j != 7):
-            output += '-'
-
-    for i in range(8, 0, -1):
-        output = output.replace(' ' * i, str(i))
-
-    return output
+                expanded += i
+        label = [vocab[char] for char in expanded]  # Convert characters to ASCII values
+        label = torch.tensor(label, dtype=torch.int32)
+        return image.to(torch.long), label
+    
+'''
+Note on labels:
+    In FEN spaces are grouped so 3 blank squares yields a 3 instead of 3 0s
+    This could easily be taken care of outside of the network
+    Essentially encourage the network to only give 0s for every blank square
+    Then convert labels to and from proper notation
+    This has a few benefits:
+        predictable max_len
+        easier for transformer to see 64 squares and output 64 values
+'''
 
 def calculate_accuracy(predictions, labels):
     correct_predictions = (predictions == labels).sum().item()
     accuracy = correct_predictions / labels.shape[1]
     return accuracy
+
+def test_data_processing(data_dir, start, stop):
+    image_list = [filename for filename in os.listdir(data_dir) if filename.endswith('.jpeg')]
+    max_len = max(len(filename.split('.')[0]) for filename in image_list)
+    for i in range(start, stop):
+        # img_name = os.path.join(data_dir, image_list[i])
+        # image = torchvision.io.read_image(img_name)
+        label = image_list[i].split('.')[0]
+        expanded = ""
+        for i in label:
+            if i.isdigit():
+                for j in range(int(i)):
+                    expanded += "0"
+            else:
+                expanded += i
+        print(expanded)
+        label = [vocab[char] for char in expanded]  # Convert characters to ASCII values
+        print(label)
+        label = torch.tensor(label, dtype=torch.int32)
+        # image = torch.LongTensor(image)
+        # print(image.shape, image.dtype)
+        # print(label, label.dtype)
+
+# test_data_processing('data/train', 128*37, 128*39)

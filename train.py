@@ -30,6 +30,7 @@ def train(model, train_loader, optimizer, criterion, device):
         predictions = model(images, labels)
 
         # backward pass
+        # TODO: fix loss function (maybe do loss for each token separately?)
         loss = criterion(predictions, labels.to(torch.float))
         loss.backward()
         optimizer.step()
@@ -98,12 +99,12 @@ if __name__ ==  '__main__':
     train_dataset = ChessboardDataset(data_dir=train_data_dir)
     val_dataset = ChessboardDataset(data_dir=val_data_dir)
 
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
 
     # model
     if args.model == "VisionTransformer":
-        model = ImageTransformer(d_model=args.d_model, nhead=args.nhead, dim_feedforward=args.dim_feedforward, dropout=args.dropout, num_layers=args.num_layers, device=device, image_analysis=args.image_analysis).to(device)
+        model = ImageTransformer(d_model=args.d_model, nhead=args.nhead, num_layers=args.num_layers, dim_feedforward=args.dim_feedforward, dropout=args.dropout, max_len=train_dataset.max_len, device=device, image_analysis=args.image_analysis).to(device)
     else:
         raise Exception("Invalid model")
 

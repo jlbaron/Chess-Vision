@@ -6,20 +6,32 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 import matplotlib.pyplot as plt
-    
+
+'''
+400x400x3
+convolution to turn into single channel
+400x400x1
+split into 64 sections of 50x50
+64x50x50
+feed through a convolution layer for dimensionality reduction
+do a kernel 1 convolution with d_model output features to get 64x50x50xd_model (drop 50x50 to get 64xd_model)
+'''
 class ImagePatchEncoder(nn.Module):
-    def __init__(self, d_model, patch_size=20, num_patches=400, channels=3, device='cpu', image_analysis=False):
+    def __init__(self, d_model, patch_size=50, num_patches=64, channels=3, device='cpu', image_analysis=False):
         super(ImagePatchEncoder, self).__init__()
         self.patch_size = patch_size
+        # TODO: add an assert to make sure patch size divides evenly
+        self.sqrt_patch_size = int(math.sqrt(num_patches))
         self.num_patches = num_patches
+        self.device_name = device
 
-        # 400-20= 380/20 = 19+1 = 20
-        self.cnn = nn.Conv2d(channels, d_model, patch_size, patch_size)
+        #400x400x3 -> 400x400x1
+        self.cnn = nn.Conv2d(channels, 1, 1, 1, device=device)
 
-        #TODO: after consulting with visualizations I see the need for some changes
-        # split image into 8x8 images then pass each through a conv, size 1, to get 8x8x1
-        # embed to d_model so that there are 64xd_model patches of the board
-        # positional encoding as normal
+        # (unsqueeze final index) -> 400x400
+        # split into 64x50x50, flatten to 64x2500
+        # linear layer to embed 2500 to d_model -> 64xd_model
+        self.linear = nn.Linear(patch_size*patch_size, d_model, device=device)
 
         # Create positional encoding for each patch
         self.positional_encoding = self.create_positional_encoding(d_model, self.num_patches, device)
@@ -39,43 +51,62 @@ class ImagePatchEncoder(nn.Module):
         return positional_encoding
 
     def visualize_cnn_output(self, cnn_output, filename):
+        seq, height, width = cnn_output.shape
+        wspace = 0.1
+        hspace = 0.1
+        fig, axes = plt.subplots(self.sqrt_patch_size, self.sqrt_patch_size, figsize=(12, 12))
+        axes = axes.flatten()
+        for s in range(seq):
+            # Extract the current patch
+            patch = cnn_output[s].cpu().detach().numpy()
+
+            # Display the patch in the corresponding subplot
+            axes[s].imshow(patch, cmap='viridis', interpolation='nearest')
+            axes[s].axis('off')
         plt.imshow(cnn_output[0].cpu().detach().numpy(), cmap='viridis', interpolation='nearest')
-        plt.axis('off')
+        plt.subplots_adjust(wspace=wspace, hspace=hspace)
         plt.savefig(filename)  # Save the figure with the provided filename
 
     def forward(self, x, labels=None):
         # Input x: (batch_size, height, width, channels)
 
-        # use a cnn to reduce x to d_modelx20x20
+        # use a cnn to compress color channels
         x = self.cnn(x)
+        x = x.squeeze(1) # do away with the 1 in bx1x400x400
+        split_image = torch.zeros([x.shape[0], self.num_patches, self.patch_size, self.patch_size], device=self.device_name)
+        # needs to iterate as row/col
+        iter = 0
+        for h in range(self.sqrt_patch_size):
+            for w in range(self.sqrt_patch_size):
+                h_start = h*self.patch_size
+                h_end = h_start+self.patch_size
+                w_start = w*self.patch_size
+                w_end = w_start+self.patch_size
+                split_image[:, iter] = x[:, h_start:h_end, w_start:w_end]
+                iter += 1
 
         if self.image_analysis and labels is not None:
             # Select a random sample index from the batch
-            random_sample = torch.randint(0, x.shape[0], (1,)).item()
+            random_sample = torch.randint(0, split_image.shape[0], (1,)).item()
             
             # use label but need to convert back to string (it is an ASCII list)
             header = "visualizations\\cnn_output\\"
             label = ""
             for val in labels[random_sample]:
                 label += chr(val)
-            # label = "visualizations\\cnn_output\\5NR1-4P3-1P6-N4N2-8-4BB2-7k-1K5Q"
             filename = header+ label.replace(chr(0), "") + ".png"
             
             # Create and save the CNN output visualization
-            # self.visualize_cnn_output(x[random_sample], str(filename))
-            self.visualize_cnn_output(x[random_sample], filename)
+            self.visualize_cnn_output(split_image[random_sample], filename)
 
-
-        x = x.flatten(2)
-        x = x.permute(0, 2, 1)
-
+        x = split_image.flatten(2)
+        x = self.linear(x)
         # Add positional encoding to each patch
         x = x + self.positional_encoding
-
         return x
     
 class ImageTransformer(nn.Module):
-    def __init__(self, d_model=512, nhead=4, num_layers=1, dim_feedforward=2048, dropout=0.1, max_len=45, device='cpu', image_analysis=False):
+    def __init__(self, d_model=512, nhead=4, num_layers=1, dim_feedforward=2048, dropout=0.1, max_len=71, device='cpu', image_analysis=False):
         super(ImageTransformer, self).__init__()
 
         self.embedding = ImagePatchEncoder(d_model=d_model, device=device, image_analysis=image_analysis)
