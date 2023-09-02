@@ -9,8 +9,15 @@ Inputs: 400x400 pixel images of digital chess boards
         train: 80000  test: 20000
 
 process:
-convert labels to encodings
-downsample each image (carefully)
-divide into squares for input to transformer
-append cls token and retrieve from output
-cross-entropy loss 
+        convert labels to encodings
+        divide image into squares
+        embed and positional encoding
+        append cls token and retrieve from output
+        cross-entropy loss 
+
+progress:
+        data loading process complete
+        transformer embeddings functional
+        train loop functional
+        working to debug rest of transformer forward pass
+                additionally going to add more metrics to better understand training
