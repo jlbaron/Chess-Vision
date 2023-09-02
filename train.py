@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 from models.VisionTransformer import ImageTransformer
 from utils import ChessboardDataset, calculate_accuracy
 import matplotlib.pyplot as plt
+import os
 
 parser = argparse.ArgumentParser(description='Chess-Vision')
 parser.add_argument('--config', default='.\\configs\\config_VisionTransformer.yaml')
@@ -30,7 +31,6 @@ def train(model, train_loader, optimizer, criterion, device):
         predictions = model(images, labels)
 
         # backward pass
-        # TODO: fix loss function (maybe do loss for each token separately?)
         loss = criterion(predictions, labels.to(torch.float))
         loss.backward()
         optimizer.step()
@@ -55,7 +55,7 @@ def evaluate(model, val_loader, criterion, device):
 
             # perform forward pass
             predictions = model(images)
-            loss = criterion(predictions, labels)
+            loss = criterion(predictions, labels.to(torch.float))
             
             total_loss += loss.item()
             acc = calculate_accuracy(predictions, labels)
@@ -69,14 +69,14 @@ def plot_curves(train_losses, train_accuracies, val_losses, val_accuracies):
     plt.title("Training and Validation Loss")
     plt.xlabel("Epochs")
     plt.ylabel("Loss")
-    plt.savefig("loss.png")
+    plt.savefig("visualizations\\training_plots\\loss.png")
     plt.show()
     plt.plot(train_accuracies, label="Training Accuracies")
     plt.plot(val_accuracies, label="Validation Accuracies")
     plt.title("Training and Validation Accuracy")
     plt.xlabel("Epochs")
     plt.ylabel("Accuracy")
-    plt.savefig("acc.png")
+    plt.savefig("visualizations\\training_plots\\acc.png")
     plt.show()
 
 if __name__ ==  '__main__':
@@ -99,7 +99,7 @@ if __name__ ==  '__main__':
     train_dataset = ChessboardDataset(data_dir=train_data_dir)
     val_dataset = ChessboardDataset(data_dir=val_data_dir)
 
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=True, num_workers=4)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True, num_workers=4)
 
     # model
@@ -123,11 +123,14 @@ if __name__ ==  '__main__':
     val_accuracies = []
     for epoch in range(args.epochs):
         model, train_loss, train_acc = train(model, train_loader, optimizer, criterion, device)
-        model, val_loss, val_acc = evaluate(model, val_loader, criterion, device)
+        val_loss, val_acc = evaluate(model, val_loader, criterion, device)
         train_losses.append(train_loss)
         train_accuracies.append(train_acc)
         val_losses.append(val_loss)
         val_accuracies.append(val_acc)
         print(f"--------EPOCH {epoch+1}, TRAIN LOSS: {train_loss}, TRAIN ACC: {train_acc}, VAL LOSS: {val_loss}, VAL ACC: {val_acc}---------")
         print("---------------------------------------------------")
+    model_path = os.path.join('checkpoints', f"{args.model}_trained.pt")
+    torch.save(model.state_dict(), model_path)
+    print(f"Trained model saved to '{model_path}'.")
     plot_curves(train_losses, train_accuracies, val_losses, val_accuracies)
