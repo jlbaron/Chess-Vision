@@ -1,7 +1,7 @@
 Train:
   batch_size: 128
   learning_rate: 0.00001
-  epochs: 100
+  epochs: 10
 
 network:
   model: VisionTransformer
@@ -12,7 +12,8 @@ network:
   dropout: 0.1
 
 debug:
-  image_analysis: False
+  # image_analysis: [1, 1, 1]
+  image_analysis: [0, 0, 0]
 
 data:
   beta: .9999999

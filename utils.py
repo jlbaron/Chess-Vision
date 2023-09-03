@@ -24,15 +24,18 @@ import torchvision
 from torch.utils.data import Dataset, DataLoader
 
 vocab = {
+    "-": 999,
     "0": 0,
-    "-": 1,
-    "p": 2, "P": 3,
-    "n": 4, "N": 5,
-    "b": 6, "B": 7,
-    "r": 8, "R": 9,
-    "q": 10, "Q": 11,
-    "k": 12, "K": 13
+    "p": 1, "P": 2,
+    "n": 3, "N": 4,
+    "b": 5, "B": 6,
+    "r": 7, "R": 8,
+    "q": 9, "Q": 10,
+    "k": 11, "K": 12
 }
+
+inv_vocab = {v: k for k, v in vocab.items()}
+
 
 class ChessboardDataset(Dataset):
     def __init__(self, data_dir):
@@ -71,10 +74,35 @@ Note on labels:
         predictable max_len
         easier for transformer to see 64 squares and output 64 values
 '''
+# 1
+def label_to_string(label):
+    label_as_list = label.tolist()
+    counter = 0
+    new_label = ""
+    for i in label_as_list:
+        if i == 0:
+            counter += 1
+        else:
+            if counter > 0:
+                new_label += str(counter)
+                new_label += inv_vocab[i]
+                counter = 0
+            else:
+                new_label += inv_vocab[i]
+    if counter > 0:
+        new_label += str(counter)
+    return new_label
 
 def calculate_accuracy(predictions, labels):
     correct_predictions = (predictions == labels).sum().item()
     accuracy = correct_predictions / labels.shape[1]
+    return accuracy
+
+# for every token in predictions count if the same as token in labels and div by total
+# 71 different class scores for 13 classes (ie 71 probabilities of 13 tokens = 71 tokens)
+def per_word_acc(predictions, labels):
+    accuracy = 0.
+    print(predictions[0]*100, labels[0])
     return accuracy
 
 def test_data_processing(data_dir, start, stop):

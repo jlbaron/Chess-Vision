@@ -10,7 +10,7 @@ import torch.nn as nn
 from os import listdir
 from torch.utils.data import DataLoader
 from models.VisionTransformer import ImageTransformer
-from utils import ChessboardDataset, calculate_accuracy
+from utils import ChessboardDataset, calculate_accuracy, per_word_acc
 import matplotlib.pyplot as plt
 import os
 
@@ -39,7 +39,8 @@ def train(model, train_loader, optimizer, criterion, device):
         total_loss += loss.item()
         acc = calculate_accuracy(predictions, labels)
         total_acc += acc
-        print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}")
+        per_word = per_word_acc(predictions, labels)
+        print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}, Acc/Word: {per_word}")
     return model, total_loss / len(train_loader), total_acc / len(train_loader)
 
 def evaluate(model, val_loader, criterion, device):
@@ -60,7 +61,8 @@ def evaluate(model, val_loader, criterion, device):
             total_loss += loss.item()
             acc = calculate_accuracy(predictions, labels)
             total_acc += acc
-            print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}")
+            per_word = per_word_acc(predictions, labels)
+            print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}, Acc/Word: {per_word}")
     return total_loss / len(val_loader), total_acc / (len(val_loader))
 
 def plot_curves(train_losses, train_accuracies, val_losses, val_accuracies):
