@@ -31,7 +31,8 @@ def train(model, train_loader, optimizer, criterion, device):
         predictions = model(images, labels)
 
         # backward pass
-        loss = criterion(predictions, labels.to(torch.float))
+        loss = criterion(predictions.to(torch.float), labels.to(torch.float))
+        loss.requires_grad = True
         loss.backward()
         optimizer.step()
         
@@ -56,7 +57,7 @@ def evaluate(model, val_loader, criterion, device):
 
             # perform forward pass
             predictions = model(images)
-            loss = criterion(predictions, labels.to(torch.float))
+            loss = criterion(predictions.to(torch.float), labels.to(torch.float))
             
             total_loss += loss.item()
             acc = calculate_accuracy(predictions, labels)

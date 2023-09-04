@@ -23,6 +23,7 @@ import torch
 import torchvision
 from torch.utils.data import Dataset, DataLoader
 
+# - is a special character that wont be learned
 vocab = {
     "-": 999,
     "0": 0,
@@ -33,6 +34,7 @@ vocab = {
     "q": 9, "Q": 10,
     "k": 11, "K": 12
 }
+dash_idx = 999
 
 inv_vocab = {v: k for k, v in vocab.items()}
 
@@ -60,7 +62,8 @@ class ChessboardDataset(Dataset):
                     expanded += "0"
             else:
                 expanded += i
-        label = [vocab[char] for char in expanded]  # Convert characters to ASCII values
+        label = [vocab[char] for char in expanded]  # Convert characters to vocab values
+        label = [i for i in label if i != dash_idx]
         label = torch.tensor(label, dtype=torch.int32)
         return image.to(torch.long), label
     
@@ -74,9 +77,16 @@ Note on labels:
         predictable max_len
         easier for transformer to see 64 squares and output 64 values
 '''
-# 1
+# convert label that has been formatted for learning back to original form
 def label_to_string(label):
     label_as_list = label.tolist()
+    j = 0
+    for i in range(len(label_as_list)):
+        if (j+1) % 9 == 0:
+            label_as_list.insert(dash_idx, j)
+            j += 1
+        j += 1
+
     counter = 0
     new_label = ""
     for i in label_as_list:
@@ -101,9 +111,13 @@ def calculate_accuracy(predictions, labels):
 # for every token in predictions count if the same as token in labels and div by total
 # 71 different class scores for 13 classes (ie 71 probabilities of 13 tokens = 71 tokens)
 def per_word_acc(predictions, labels):
-    accuracy = 0.
-    print(predictions[0]*100, labels[0])
-    return accuracy
+    accuracy = torch.zeros(predictions.shape[0])
+    for b in range(predictions.shape[0]):
+        for s in range(predictions.shape[1]):
+            if predictions[b][s] == labels[b][s]:
+                accuracy[b] += 1
+        accuracy[b] = accuracy[b] / 64 if accuracy[b] > 0 else 0
+    return torch.mean(accuracy).item()
 
 def test_data_processing(data_dir, start, stop):
     image_list = [filename for filename in os.listdir(data_dir) if filename.endswith('.jpeg')]

@@ -12,7 +12,8 @@ process:
         convert labels to encodings
         divide image into squares
         embed and positional encoding
-        append cls token and retrieve from output
+        pass transformer output through linear for vocab scores
+        softmax vocab scores and convert to sequence of tokens
         cross-entropy loss 
 
 progress:
@@ -21,3 +22,8 @@ progress:
         train loop functional
         working to debug rest of transformer forward pass
                 additionally going to add more metrics to better understand training
+                then will optimize and train
+
+TODO:
+        Optimize forward pass
+        analyze trained model
