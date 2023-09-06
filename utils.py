@@ -78,15 +78,15 @@ Note on labels:
         easier for transformer to see 64 squares and output 64 values
 '''
 # convert label that has been formatted for learning back to original form
+# data will always be 64 tokens and needs to be expanded to 71 tokens where every 9th token is dash
+# additionally the final string needs to have 0s compressed
 def label_to_string(label):
     label_as_list = label.tolist()
     j = 0
-    for i in range(len(label_as_list)):
-        if (j+1) % 9 == 0:
-            label_as_list.insert(dash_idx, j)
-            j += 1
+    while j < len(label_as_list):
+        if (j + 1) % 9 == 0:
+            label_as_list.insert(j, dash_idx)  # Insert dash_idx at the current index j
         j += 1
-
     counter = 0
     new_label = ""
     for i in label_as_list:
@@ -111,13 +111,8 @@ def calculate_accuracy(predictions, labels):
 # for every token in predictions count if the same as token in labels and div by total
 # 71 different class scores for 13 classes (ie 71 probabilities of 13 tokens = 71 tokens)
 def per_word_acc(predictions, labels):
-    accuracy = torch.zeros(predictions.shape[0])
-    for b in range(predictions.shape[0]):
-        for s in range(predictions.shape[1]):
-            if predictions[b][s] == labels[b][s]:
-                accuracy[b] += 1
-        accuracy[b] = accuracy[b] / 64 if accuracy[b] > 0 else 0
-    return torch.mean(accuracy).item()
+    accuracy = (predictions == labels).float().mean(dim=1)
+    return accuracy.mean().item()
 
 def test_data_processing(data_dir, start, stop):
     image_list = [filename for filename in os.listdir(data_dir) if filename.endswith('.jpeg')]

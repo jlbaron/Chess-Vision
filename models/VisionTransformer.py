@@ -15,8 +15,8 @@ convolution to turn into single channel
 400x400x1
 split into 64 sections of 50x50
 64x50x50
-feed through a convolution layer for dimensionality reduction
-do a kernel 1 convolution with d_model output features to get 64x50x50xd_model (drop 50x50 to get 64xd_model)
+flatten and linear project into embeddings
+output 64x512
 '''
 class ImagePatchEncoder(nn.Module):
     def __init__(self, d_model, patch_size=50, num_patches=64, channels=3, device='cpu', image_analysis=[0, 0, 0]):
@@ -100,17 +100,15 @@ class ImagePatchEncoder(nn.Module):
         # use a cnn to compress color channels
         x = self.cnn(x)
         x = x.squeeze(1) # do away with the 1 in bx1x400x400
-        split_image = torch.zeros([x.shape[0], self.num_patches, self.patch_size, self.patch_size], device=self.device_name)
-        # needs to iterate as row/col
-        iter = 0
-        for h in range(self.sqrt_patch_size):
-            for w in range(self.sqrt_patch_size):
-                h_start = h*self.patch_size
-                h_end = h_start+self.patch_size
-                w_start = w*self.patch_size
-                w_end = w_start+self.patch_size
-                split_image[:, iter] = x[:, h_start:h_end, w_start:w_end]
-                iter += 1
+
+        # Reshape the input tensor `x` into a tensor of segments
+        x_reshaped = x.view(x.size(0), self.sqrt_patch_size, self.patch_size, self.sqrt_patch_size, self.patch_size)
+
+        # Transpose the dimensions to bring the segments together
+        x_transposed = x_reshaped.permute(0, 1, 3, 2, 4)
+
+        # Reshape the tensor to combine rows and columns into a single sequence of 64
+        split_image = x_transposed.contiguous().view(x.size(0), self.num_patches, self.patch_size, self.patch_size)
 
         random_sample = None
         if self.image_analysis[0] and labels is not None:
@@ -151,7 +149,7 @@ class ImagePatchEncoder(nn.Module):
         return x
     
 class ImageTransformer(nn.Module):
-    def __init__(self, d_model=512, nhead=4, num_layers=1, dim_feedforward=2048, dropout=0.1, max_len=71, vocab_dim=13, device='cpu', image_analysis=[0, 0, 0]):
+    def __init__(self, d_model=512, nhead=4, num_layers=1, dim_feedforward=2048, dropout=0.1, max_len=64, vocab_dim=13, device='cpu', image_analysis=[0, 0, 0]):
         super(ImageTransformer, self).__init__()
         self.max_len = max_len
         self.device_name = device
@@ -159,33 +157,21 @@ class ImageTransformer(nn.Module):
 
         encoder_layer = nn.TransformerEncoderLayer( d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout, device=device)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        # self.linear = nn.Linear(d_model, max_len)
         self.output_layer = nn.Linear(d_model, vocab_dim)  # Single linear layer for all positions
+        self.softmax = nn.Softmax(dim=-1)
 
     def normalize_image(self, image_batch):
             image_batch = image_batch.float() / 255.0
             return image_batch
-    # TODO: incomplete, this is meant to take [batch, seq] where seq=64 and append 7 "-" at the correct idx to make seq==maxlen (71)
-    def format_output_sequence(self, x):
-        # for every batch: append a [999] in idx 7, 15, 23, 31, 39, 47, 55
-        dash_idx = torch.tensor([999], device=self.device_name) # idx of - in vocab
-        expanded_x = torch.empty([x.shape[0], self.max_len], device=self.device_name, requires_grad=False) # [batch, max_len]
-        # loop through x, tracking when to also append dash
-        for b in range(x.shape[0]):
-            j = 0
-            for i in range(x.shape[1]):
-                if (j+1) % 9 == 0:
-                    expanded_x[b][j] = dash_idx
-                    j += 1
-                expanded_x[b][j] = x[b][i]
-                j += 1
-        return expanded_x
     def forward(self, x, labels=None):
         x = self.normalize_image(x)
         x = self.embedding(x, labels)
         x = self.transformer_encoder(x)
+
         # convert to sequence of class probabilities, softmax, then argmax to get 64 tokens
-        x = torch.softmax(self.output_layer(x), dim=-1)
+        x = self.softmax(self.output_layer(x))
         x = torch.argmax(x, dim=2)
-        # x = self.format_output_sequence(x)
+        # TODO: experiment with another technique to get tokens from transformer output
+        # [batch, seq, d_model] -> [batch, seq, vocab_len]  -> [batch, seq]
+        # or just [batch, seq, vocab_len]?
         return x
