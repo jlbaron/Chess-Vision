@@ -1,15 +1,12 @@
 Train:
   batch_size: 128
-  learning_rate: 0.0005
-  epochs: 50
+  learning_rate: 0.0001
+  epochs: 25
 
 network:
-  model: VisionTransformer
-  d_model: 256 
-  nhead: 2 
-  dim_feedforward: 1024 
-  num_layers: 2
-  dropout: 0.1
+  # model: CNN
+  model: split_CNN
+  vocab_dim: 13
 
 debug:
   # image_analysis: [1, 1, 1]

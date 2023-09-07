@@ -1,5 +1,7 @@
 '''
-setting up main loop
+Vision transformer
+takes embedded board squares as input
+produces sequence of class guesses for pieces
 '''
 import torch
 import torch.nn as nn

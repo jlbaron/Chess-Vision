@@ -10,41 +10,62 @@ import torch.nn as nn
 from os import listdir
 from torch.utils.data import DataLoader
 from models.VisionTransformer import ImageTransformer
-from utils import ChessboardDataset, calculate_accuracy, per_word_acc
+from models.CNN import ImageCNN, BoardSplicer, SquareClassifier
+from utils import ChessboardDataset, per_word_acc
 import matplotlib.pyplot as plt
 import os
 
 parser = argparse.ArgumentParser(description='Chess-Vision')
 parser.add_argument('--config', default='.\\configs\\config_VisionTransformer.yaml')
 
-def train(model, train_loader, optimizer, criterion, device):
+def train(model, splicer, train_loader, optimizer, criterion, device):
+    is_cnn_split = True if args.model == "split_CNN" else False
+    if is_cnn_split:
+        splicer.eval()
+    model.train()
+
     total_loss = 0.
     total_acc = 0.
-    model.train()
     for idx, (images, labels) in enumerate(train_loader):
         # put on device
         images = images.to(device)
         labels = labels.to(device)
 
+        image_shape = None
+        if is_cnn_split:
+            images = splicer(images, labels)
+            image_shape = images.shape
+            # convert labels [batch, seq] to one-hots [batch*seq]
+            labels = labels.flatten(0)
+            # convert images [batch, seq, token_len] to [batch*seq, token_len]
+            images = images.flatten(0, 1)
+            # images will become [batch*seq, vocab_dim] after forward pass
+            labels = torch.tensor(labels, dtype=torch.long, device=device)
+
         # perform forward pass
         optimizer.zero_grad()
-        predictions = model(images, labels)
+        predictions = model(images)
 
         # backward pass
-        loss = criterion(predictions.to(torch.float), labels.to(torch.float))
-        loss.requires_grad = True
+        loss = criterion(predictions, labels)
         loss.backward()
         optimizer.step()
         
         # calculate accuracy
+        if is_cnn_split:
+            predictions = torch.argmax(torch.softmax(predictions, dim=-1), dim=-1)
+            acc = per_word_acc(predictions.reshape(image_shape[0], image_shape[1]), labels.reshape(image_shape[0], image_shape[1]))
+        else:
+            acc = per_word_acc(predictions, labels)
         total_loss += loss.item()
-        acc = calculate_accuracy(predictions, labels)
         total_acc += acc
-        per_word = per_word_acc(predictions, labels)
-        print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}, Acc/Word: {per_word}")
+        # print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}")
     return model, total_loss / len(train_loader), total_acc / len(train_loader)
 
-def evaluate(model, val_loader, criterion, device):
+def evaluate(model, splicer, val_loader, criterion, device):
+    is_cnn_split = True if args.model == "split_CNN" else False
+    if is_cnn_split:
+        splicer.eval()
     model.eval()
 
     total_loss = 0.
@@ -55,15 +76,30 @@ def evaluate(model, val_loader, criterion, device):
             images = images.to(device)
             labels = labels.to(device)
 
+            image_shape = None
+            if is_cnn_split:
+                images = splicer(images, labels)
+                image_shape = images.shape
+                # convert labels [batch, seq] to one-hots [batch*seq]
+                labels = labels.flatten(0)
+                # convert images [batch, seq, token_len] to [batch*seq, token_len]
+                images = images.flatten(0, 1)
+                # images will become [batch*seq, vocab_dim] after forward pass
+                labels = torch.tensor(labels, dtype=torch.long, device=device)
+
             # perform forward pass
             predictions = model(images)
-            loss = criterion(predictions.to(torch.float), labels.to(torch.float))
+            loss = criterion(predictions, labels)
             
+            # calculate accuracy
+            if is_cnn_split:
+                predictions = torch.argmax(torch.softmax(predictions, dim=-1), dim=-1)
+                acc = per_word_acc(predictions.reshape(image_shape[0], image_shape[1]), labels.reshape(image_shape[0], image_shape[1]))
+            else:
+                acc = per_word_acc(predictions, labels)
             total_loss += loss.item()
-            acc = calculate_accuracy(predictions, labels)
             total_acc += acc
-            per_word = per_word_acc(predictions, labels)
-            print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}, Acc/Word: {per_word}")
+            # print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}")
     return total_loss / len(val_loader), total_acc / (len(val_loader))
 
 def plot_curves(train_losses, train_accuracies, val_losses, val_accuracies):
@@ -108,11 +144,16 @@ if __name__ ==  '__main__':
     # model
     if args.model == "VisionTransformer":
         model = ImageTransformer(d_model=args.d_model, nhead=args.nhead, num_layers=args.num_layers, dim_feedforward=args.dim_feedforward, dropout=args.dropout, max_len=train_dataset.max_len, device=device, image_analysis=args.image_analysis).to(device)
+    elif args.model == "CNN":
+        model = ImageCNN(dropout=args.dropout, device=device, image_analysis=args.image_analysis)
+    elif args.model == "split_CNN":
+        splicer = BoardSplicer(device=device, image_analysis=args.image_analysis)
+        model = SquareClassifier(device=device)
     else:
         raise Exception("Invalid model")
 
     # optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, betas=(0.9, 0.999), weight_decay=args.weight_decay)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, betas=(0.8, 0.999))
 
     if args.loss_type == "CE":
         criterion = nn.CrossEntropyLoss()
@@ -125,15 +166,26 @@ if __name__ ==  '__main__':
     val_losses = []
     val_accuracies = []
     for epoch in range(args.epochs):
-        model, train_loss, train_acc = train(model, train_loader, optimizer, criterion, device)
-        val_loss, val_acc = evaluate(model, val_loader, criterion, device)
+        # train and eval
+        model, train_loss, train_acc = train(model, splicer, train_loader, optimizer, criterion, device)
+        val_loss, val_acc = evaluate(model, splicer, val_loader, criterion, device)
+
+        # append to counters
         train_losses.append(train_loss)
         train_accuracies.append(train_acc)
         val_losses.append(val_loss)
         val_accuracies.append(val_acc)
+
+        # save models
+        model_path = os.path.join('checkpoints', f"{args.model}_trained.pt")
+        torch.save(model.state_dict(), model_path)
+        print(f"Trained model saved to '{model_path}'.")
+        if args.model == "split_CNN":
+            model_path = os.path.join('checkpoints', f"splicer_trained.pt")
+            torch.save(splicer.state_dict(), model_path)
+            print(f"Splicer saved to '{model_path}'.")
+
+        # print training info
         print(f"--------EPOCH {epoch+1}, TRAIN LOSS: {train_loss}, TRAIN ACC: {train_acc}, VAL LOSS: {val_loss}, VAL ACC: {val_acc}---------")
         print("---------------------------------------------------")
-    model_path = os.path.join('checkpoints', f"{args.model}_trained.pt")
-    torch.save(model.state_dict(), model_path)
-    print(f"Trained model saved to '{model_path}'.")
     plot_curves(train_losses, train_accuracies, val_losses, val_accuracies)

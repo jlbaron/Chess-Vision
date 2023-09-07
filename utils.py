@@ -103,11 +103,6 @@ def label_to_string(label):
         new_label += str(counter)
     return new_label
 
-def calculate_accuracy(predictions, labels):
-    correct_predictions = (predictions == labels).sum().item()
-    accuracy = correct_predictions / labels.shape[1]
-    return accuracy
-
 # for every token in predictions count if the same as token in labels and div by total
 # 71 different class scores for 13 classes (ie 71 probabilities of 13 tokens = 71 tokens)
 def per_word_acc(predictions, labels):
