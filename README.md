@@ -25,5 +25,11 @@ progress:
                 then will optimize and train
 
 TODO:
-        Optimize forward pass
         analyze trained model
+
+Visualizations:
+        sample same label from each epoch and see how it improves over time
+                choose label from test set, if label in labels then add info to variables (later save to csv)
+                also snag the cnn output
+        can make a gif of process
+                original image -> grayscale -> split -> guesses over time
