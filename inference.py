@@ -1,20 +1,3 @@
-'''
-Script to perform various analyses on trained model
-Currently implemented confusion matrix and working on t-SNE
-reference classes:
-    'CH': 0 : Changeup
-    'CU': 1 : Curveball
-    'EP': 2 : Eephus
-    'FC': 3 : Cutter
-    'FF': 4 : Four-seam Fastball
-    'FS': 5 : Splitter
-    'FT': 6 : Two-seam Fastball
-    'KC': 7 : Knuckle Curve
-    'KN': 8 : Knuckleball
-    'SC': 9 : Screwball
-    'SI': 10 : Sinker
-    'SL': 11 : Slider
-'''
 import yaml
 import argparse
 import torch
@@ -25,7 +8,9 @@ from models.CNN import BoardSplicer, SquareClassifier
 from utils import ChessboardDataset, label_to_string
 
 parser = argparse.ArgumentParser(description='Chess-Vision')
-parser.add_argument('--config', default='.\\configs\\config_CNN.yaml')
+parser.add_argument('--config', default='.\\configs\\config_CNN.yaml', help='Path to the configuration file. Default: .\\configs\\config_CNN.yaml')
+parser.add_argument('--sample', default='data\\test\\1b1B1Qr1-7p-6r1-2P5-4Rk2-1K6-4B3-8.jpeg', help='Path to the sample image file. Default: data\\test\\1b1B1Qr1-7p-6r1-2P5-4Rk2-1K6-4B3-8.jpeg')
+parser.add_argument('--eval-test', default=False, help='Specify whether to evaluate the test or not. Default: False')
 
 def load_model(model_path, splicer_path):
     model = SquareClassifier()  # Replace with your actual model class
@@ -76,8 +61,33 @@ def output_test(model, splicer, test_loader):
     output = pd.DataFrame(output)
     print(output.head())
 
-    output.to_csv("data\\test_results.csv")
+    output.to_csv("visualizations\\test_results.csv")
 
+def process_sample(model, splicer, sample):
+    #TODO: resize image to 400x400x3 if not already
+    image = splicer(sample.unsqueeze(0))
+    image_shape = image.shape
+    image = image.squeeze(0)
+    prediction = model(image)
+    prediction = torch.argmax(torch.softmax(prediction, dim=-1), dim=-1)
+    prediction = prediction.reshape(image_shape[0], image_shape[1])
+    formatted = label_to_string(prediction[0])
+    raw = ''.join([str(int(i)) for i in prediction[0]])
+    return raw, formatted
+
+'''
+Usage: python inference.py [OPTIONS]
+
+Options:
+  --config CONFIG_PATH  Path to the configuration file.
+                        Default: .\\configs\\config_CNN.yaml
+
+  --sample SAMPLE_PATH  Path to the sample image file.
+                        Default: data\\test\\1b1B1Qr1-7p-6r1-2P5-4Rk2-1K6-4B3-8.jpeg
+
+  --eval-test EVAL_TEST Specify whether to evaluate the test or not.
+                        Default: False
+'''
 def main():
     #args from yaml file
     global args
@@ -88,18 +98,25 @@ def main():
     for key in config:
         for k, v in config[key].items():
             setattr(args, k, v)
-
+    
     # Load the model
     model_path = 'checkpoints/split_CNN_trained.pt'
     splicer_path = 'checkpoints/splicer_trained.pt'
     model, splicer = load_model(model_path, splicer_path)
 
-    # Load the data loaders
-    test_dataset = ChessboardDataset('data/test')
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size)
+    # compare predictions to truth and output as a full csv
+    if args.eval_test:
+        # Load the data loaders
+        test_dataset = ChessboardDataset('data/test')
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size)
+        output_test(model, splicer, test_loader)
 
-    # compare predictions to truth
-    output_test(model, splicer, test_loader)
+    # generate label on novel sample
+    sample_path = args.sample
+    assert(sample_path.endswith('.jpeg'))
+    sample = torch.io.read_image(sample_path)
+    raw, formatted = process_sample(model, splicer, sample)
+    print(raw, formatted)
 
 if __name__ == "__main__":
     main()

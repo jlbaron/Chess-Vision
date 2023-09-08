@@ -2,21 +2,21 @@
 Script to load data and train model
 '''
 
-import yaml
+import os
 import argparse
+import yaml
+import matplotlib.pyplot as plt
+import pandas as pd
 import torch
-import numpy as np
 import torch.nn as nn
-from os import listdir
 from torch.utils.data import DataLoader
+from utils import ChessboardDataset, per_word_acc
 from models.VisionTransformer import ImageTransformer
 from models.CNN import ImageCNN, BoardSplicer, SquareClassifier
-from utils import ChessboardDataset, per_word_acc
-import matplotlib.pyplot as plt
-import os
 
 parser = argparse.ArgumentParser(description='Chess-Vision')
 parser.add_argument('--config', default='.\\configs\\config_VisionTransformer.yaml')
+eval_labels = []
 
 def train(model, splicer, train_loader, optimizer, criterion, device):
     is_cnn_split = True if args.model == "split_CNN" else False
@@ -99,6 +99,9 @@ def evaluate(model, splicer, val_loader, criterion, device):
                 acc = per_word_acc(predictions, labels)
             total_loss += loss.item()
             total_acc += acc
+
+            if idx == 0:
+                eval_labels.append((labels[0], predictions[0]))
             # print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}")
     return total_loss / len(val_loader), total_acc / (len(val_loader))
 
@@ -188,4 +191,8 @@ if __name__ ==  '__main__':
         # print training info
         print(f"--------EPOCH {epoch+1}, TRAIN LOSS: {train_loss}, TRAIN ACC: {train_acc}, VAL LOSS: {val_loss}, VAL ACC: {val_acc}---------")
         print("---------------------------------------------------")
+    # save eval_labels
+    eval_df = pd.DataFrame(eval_labels)
+    eval_df.to_csv('visualizations\\eval_sample_per_epoch.csv', index=False, header=False)
+    # plot train/val loss and acc
     plot_curves(train_losses, train_accuracies, val_losses, val_accuracies)

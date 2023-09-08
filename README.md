@@ -1,35 +1,57 @@
-# Chess-Vision
-A deep computer vision model to take images of chess boards and return their FEN representation.
+<h1 align="center"> Chess-Vision (Image to FEN)</h1>
+</br>
+<p align="center">
+A deep computer vision model to take images of digital chess boards and return their FEN representation.
+</p>
 
-data source from https://www.kaggle.com/datasets/koryakinp/chess-positions
+<h2> Data </h2>
 
-Inputs: 400x400 pixel images of digital chess boards
-        28 board styles and 32 piece styles for variety
-        all positions 5-15 pieces
-        train: 80000  test: 20000
+- Source: <a href=https://www.kaggle.com/datasets/koryakinp/chess-positions>Kaggle Chess Positions - koryakinp</a>
+- Dimensions: 400x400x3
+- Variations: 28 board styles and 32 piece styles
+- Complexity: 5-15 pieces per board
+- Train/Test: 80000/200000
 
-process:
-        convert labels to encodings
-        divide image into squares
-        embed and positional encoding
-        pass transformer output through linear for vocab scores
-        softmax vocab scores and convert to sequence of tokens
-        cross-entropy loss 
+<h2> CNN Model </h2>
 
-progress:
-        data loading process complete
-        transformer embeddings functional
-        train loop functional
-        working to debug rest of transformer forward pass
-                additionally going to add more metrics to better understand training
-                then will optimize and train
+Training
+```shell
+python train.py --config configs/config_CNN.yaml
+```
+Inference (in progress)
+```shell
+python inference.py --sample path/to/sample.jpeg
+```
+<h4> Model Details </h4>
+Params: found in configs/config_CNN.yaml
 
-TODO:
-        analyze trained model
+Process:
+  1) Size 1, stride 1 CNN to convert from 3 color channels to 1
+  2) Split image into 64 squares for each square on a chess board
+  3) Pass each square through learned linear classifier to get piece
+  4) Calculate loss per square
+  5) Since the output of the model is different from actual FEN notation, to see final notation just process the sequence of class scores to create FEN
+     - Example: 00102007 -> 2p1P2r
 
-Visualizations:
-        sample same label from each epoch and see how it improves over time
-                choose label from test set, if label in labels then add info to variables (later save to csv)
-                also snag the cnn output
-        can make a gif of process
-                original image -> grayscale -> split -> guesses over time
+<h2> (In Progress) Transformer Model </h2>
+
+- This will split board squares into tokens
+- Then embed tokens into d_model space and positionally encode
+- Pass through transformer encoder layers
+- Extract vocab scores for every output token
+- Use cross-entropy loss to classify sequence
+
+<h4> Issues </h4>
+
+- Cross-entropy loss for the whole sequence seems too hard to learn
+  - could make a loss
+  - or rephrase problem at the end
+ 
+
+<h2> TODO </h2>
+
+- Visualizations
+- training graphs
+- collect and visualize samples
+- create a gif summary
+- explore transformer model
