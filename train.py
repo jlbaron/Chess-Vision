@@ -10,13 +10,13 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from utils import ChessboardDataset, per_word_acc
+from utils import ChessboardDataset, per_word_acc, inv_vocab
 from models.VisionTransformer import ImageTransformer
 from models.CNN import ImageCNN, BoardSplicer, SquareClassifier
 
 parser = argparse.ArgumentParser(description='Chess-Vision')
-parser.add_argument('--config', default='.\\configs\\config_VisionTransformer.yaml')
-eval_labels = []
+parser.add_argument('--config', default='.\\configs\\config_CNN.yaml')
+eval_labels = {"Pred" : [], "True" : []}
 
 def train(model, splicer, train_loader, optimizer, criterion, device):
     is_cnn_split = True if args.model == "split_CNN" else False
@@ -42,7 +42,7 @@ def train(model, splicer, train_loader, optimizer, criterion, device):
             # images will become [batch*seq, vocab_dim] after forward pass
             labels = torch.tensor(labels, dtype=torch.long, device=device)
 
-        # perform forward pass
+        # perform forward pass 
         optimizer.zero_grad()
         predictions = model(images)
 
@@ -51,7 +51,7 @@ def train(model, splicer, train_loader, optimizer, criterion, device):
         loss.backward()
         optimizer.step()
         
-        # calculate accuracy
+        # calculate accuracy 
         if is_cnn_split:
             predictions = torch.argmax(torch.softmax(predictions, dim=-1), dim=-1)
             acc = per_word_acc(predictions.reshape(image_shape[0], image_shape[1]), labels.reshape(image_shape[0], image_shape[1]))
@@ -59,7 +59,7 @@ def train(model, splicer, train_loader, optimizer, criterion, device):
             acc = per_word_acc(predictions, labels)
         total_loss += loss.item()
         total_acc += acc
-        # print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}")
+        print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}")
     return model, total_loss / len(train_loader), total_acc / len(train_loader)
 
 def evaluate(model, splicer, val_loader, criterion, device):
@@ -101,8 +101,13 @@ def evaluate(model, splicer, val_loader, criterion, device):
             total_acc += acc
 
             if idx == 0:
-                eval_labels.append((labels[0], predictions[0]))
-            # print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}")
+                predictions = predictions.reshape(image_shape[0], image_shape[1])
+                labels = labels.reshape(image_shape[0], image_shape[1])
+                predicted_output = ''.join([inv_vocab[i.item()]+" " for  i in predictions[0]])
+                label_output = ''.join([inv_vocab[i.item()]+" " for i in labels[0]])
+                eval_labels["Pred"].append(predicted_output)
+                eval_labels["True"].append(label_output)
+            print(f"Batch: {idx}, Loss: {loss.item()}, Acc: {acc}")
     return total_loss / len(val_loader), total_acc / (len(val_loader))
 
 def plot_curves(train_losses, train_accuracies, val_losses, val_accuracies):
@@ -193,6 +198,6 @@ if __name__ ==  '__main__':
         print("---------------------------------------------------")
     # save eval_labels
     eval_df = pd.DataFrame(eval_labels)
-    eval_df.to_csv('visualizations\\eval_sample_per_epoch.csv', index=False, header=False)
+    eval_df.to_csv('visualizations\\eval_sample_per_epoch.csv', index=False)
     # plot train/val loss and acc
     plot_curves(train_losses, train_accuracies, val_losses, val_accuracies)
