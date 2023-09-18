@@ -27,8 +27,27 @@ parser.add_argument('--config', default='.\\configs\\config_CNN.yaml', help='Pat
 # Ex: 0 b 0 B 0 Q r 0 0 0 0 0 0 0 0 p 0 0 0 0 0 0 r 0 0 0 P 0 0 0 0 0 0 0 0 0 R k 0 0 0 K 0 0 0 0 0 0 0 0 0 0 B 0 0 0 0 0 0 0 0 0 0 0 
 # becomes 1b1B1Qr1/7p/6r1/2P5/4Rk2/1K6/4B3/8
 def convert_label_to_fen(label):
+    expanded_fen = ""
+    dash_ctr = 0
+    for item in label.split(' '):
+        expanded_fen += item
+        dash_ctr += 1
+        if dash_ctr % 8 == 0:
+            expanded_fen += "-"
     fen = ""
-    return fen
+    zero_ctr = 0
+    for item in expanded_fen[:-1]:
+        if item == "0":
+            zero_ctr += 1
+        elif item == "-":
+            fen += str(zero_ctr) if zero_ctr > 0 else ""
+            fen += item
+            zero_ctr = 0
+        else:
+            fen += str(zero_ctr) if zero_ctr > 0 else ""
+            fen += item
+            zero_ctr = 0
+    return fen[:-1]
 
 def create_board_squares():
     row = []
@@ -68,7 +87,10 @@ def create_board_svg(piece_map, filename):
 
 
 # TODO: take sequence of images and turn into GIF
-def create_gif():
+def create_gif(label):
+    # find images with label.png and label(train_step).png
+    # for a given label take the images and convert to a gif
+    # have the static image on the left and the slideshow on the right for comparison
     pass
 
 '''
@@ -94,12 +116,12 @@ def main():
     df = pd.read_csv("visualizations\\eval_sample_per_epoch.csv")
     # store labels counts as dict
     # sample names include label (true/pred) and which count it is at
-    labels = df['True'].unique
+    labels = df['True'].unique()
     labels_dict = {}
     for i in labels:
         fen = convert_label_to_fen(i)
+        print(fen)
         labels_dict[fen] = 0
-    assert(0) #need to test label to FEN
     for idx in df.index:
         # TRUE
         piece_map = process_raw_input(df['True'][idx], squares)
@@ -107,7 +129,7 @@ def main():
         # PRED
         filename = convert_label_to_fen(df['True'][idx])
         piece_map = process_raw_input(df['Pred'][idx], squares)
-        create_board_svg(piece_map=piece_map, filename=f'filename({labels_dict[filename]})')
+        create_board_svg(piece_map=piece_map, filename=f'{filename}({labels_dict[filename]})')
         labels_dict[filename] += 1
 
 if __name__ == '__main__':
