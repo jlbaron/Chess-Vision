@@ -4,6 +4,20 @@
 A deep computer vision model to take images of digital chess boards and return their FEN representation.
 </p>
 
+<h2 align="center"> Overview </h2>
+
+<h4> Initial image </h4>
+
+![Input](data/train/1Q4K1-7R-7P-5rk1-1p3P2-pQ6-7p-B7.jpeg)
+
+<h4> Strip colors and split into squares </h4>
+
+![CNN Output](visualizations/cnn_output/1Q4K1-7R-7P-5rk1-1p3P2-pQ6-7p-B7.png)
+
+<h4> Classify each square to produce a prediction </h4>
+
+![Train Montage](visualizations/training_gifs/1b6-6kB-8-2r4n-2BP4-1B6-1K3P2-.gif)
+
 <h2> Data </h2>
 
 - Source: <a href=https://www.kaggle.com/datasets/koryakinp/chess-positions>Kaggle Chess Positions - koryakinp</a>
@@ -21,6 +35,10 @@ python train.py --config configs/config_CNN.yaml
 Inference (in progress)
 ```shell
 python inference.py --sample path/to/sample.jpeg
+```
+Visualizations (in progress)
+```shell
+python visualize_training.py
 ```
 <h4> Model Details </h4>
 Params: found in configs/config_CNN.yaml
@@ -49,9 +67,4 @@ Process:
  
 
 <h2> TODO </h2>
-
-- Visualizations
-- training graphs
-- collect and visualize samples
-- create a gif summary
 - explore transformer model
