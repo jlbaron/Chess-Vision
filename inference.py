@@ -12,6 +12,7 @@ parser.add_argument('--config', default='.\\configs\\config_CNN.yaml', help='Pat
 parser.add_argument('--sample', default='data\\test\\1b1B1Qr1-7p-6r1-2P5-4Rk2-1K6-4B3-8.jpeg', help='Path to the sample image file. Default: data\\test\\1b1B1Qr1-7p-6r1-2P5-4Rk2-1K6-4B3-8.jpeg')
 parser.add_argument('--eval-test', default=False, help='Specify whether to evaluate the test or not. Default: False')
 
+# load model from path
 def load_model(model_path, splicer_path):
     model = SquareClassifier()  # Replace with your actual model class
     model.load_state_dict(torch.load(model_path))
@@ -22,6 +23,7 @@ def load_model(model_path, splicer_path):
     splicer.eval()
     return model, splicer
 
+# run through eval set and save results to a csv called test_results.csv
 def output_test(model, splicer, test_loader):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -63,6 +65,8 @@ def output_test(model, splicer, test_loader):
 
     output.to_csv("visualizations\\test_results.csv")
 
+# create a label from a single sample
+# currently only supports the size I trained on (400x400x3)
 def process_sample(model, splicer, sample):
     #TODO: resize image to 400x400x3 if not already
     image = splicer(sample.unsqueeze(0))

@@ -30,6 +30,7 @@ parser.add_argument('--config', default='.\\configs\\config_CNN.yaml', help='Pat
 # take space delimited label and convert to FEN
 # Ex: 0 b 0 B 0 Q r 0 0 0 0 0 0 0 0 p 0 0 0 0 0 0 r 0 0 0 P 0 0 0 0 0 0 0 0 0 R k 0 0 0 K 0 0 0 0 0 0 0 0 0 0 B 0 0 0 0 0 0 0 0 0 0 0 
 # becomes 1b1B1Qr1/7p/6r1/2P5/4Rk2/1K6/4B3/8
+# also since I have no idea why I did spaces I made the delimiter a parameter
 def convert_label_to_fen(label, delimiter):
     expanded_fen = ""
     dash_ctr = 0
@@ -53,6 +54,8 @@ def convert_label_to_fen(label, delimiter):
             zero_ctr = 0
     return fen[:-1]
 
+# the default order of chess.SQUARES is not the order I need
+# this function swaps the order of the rows of the board
 def create_board_squares():
     row = []
     rows = []
@@ -89,33 +92,10 @@ def create_board_svg(piece_map, filename):
     svg_board = chess.svg.board(board, size=350)
     svg2png(bytestring=svg_board, write_to='visualizations\\training_progress_boards\\'+ filename + '.png')
 
-
-# def plot_imgs(img_list, real_batch, device):
-#     # create GIF
-#     fig = plt.figure(figsize=(6, 6))
-#     plt.axis("off")
-#     ims = [[plt.imshow(np.transpose(i, (1,2,0)), animated=True)] for i in img_list]
-#     ani = animation.ArtistAnimation(fig, ims, interval=1000, repeat_delay=1000, blit=True)
-#     writer = animation.PillowWriter(fps=30)
-#     ani.save('visualizations\\animation.gif', writer=writer)
-#     plt.show()
-
-#     # Plot the real images
-#     plt.figure(figsize=(8,4))
-#     plt.subplot(1,2,1)
-#     plt.axis("off")
-#     plt.title("Real Images")
-#     plt.imshow(np.transpose(make_grid(real_batch.to(device)[:64], padding=5, normalize=True).cpu(),(1,2,0)))
-
-#     # Plot the fake images from the last epoch
-#     plt.subplot(1,2,2)
-#     plt.axis("off")
-#     plt.title("Fake Images")
-#     plt.imshow(np.transpose(img_list[-1],(1,2,0)))
-#     plt.savefig("visualizations\\Real_vs_Fake.png")
-#     plt.show()
-
-# TODO: take sequence of images and turn into GIF
+# Takes label and count and creates a GIF
+# label denotes which label to use from visualizations\training_progress_boards\
+# count is how many training samples are saved in visualizations\training_progress_boards\
+# count could be epochs from config if unchanged after training
 def create_gif(label, count):
     # need to make from files in system
     truth = torchvision.io.read_image(f"visualizations\\training_progress_boards\\{label}.png")
@@ -123,7 +103,7 @@ def create_gif(label, count):
     plt.subplot(1, 2, 1)
     plt.axis("off")
     plt.title("Truth")
-    plt.imshow(np.transpose(truth, (1,2,0)))
+    plt.imshow(np.transpose(truth, (1,2,0))) # plot truth on the left
 
     img_list = [torchvision.io.read_image(f"visualizations\\training_progress_boards\\{label}({i}).png") for i in range(count)]
     plt.subplot(1, 2, 2)
@@ -131,7 +111,7 @@ def create_gif(label, count):
     plt.title("Predicted")
     ims = [[plt.imshow(np.transpose(i, (1,2,0)), animated=True)] for i in img_list]
     ani = animation.ArtistAnimation(fig, ims, interval=1000, repeat_delay=1000, blit=True)
-    writer = animation.PillowWriter(fps=20)
+    writer = animation.PillowWriter(fps=20) # plot training gif on the right
     ani.save(f'visualizations\\training_gifs\\{label}.gif', writer=writer)
     plt.show()
 
@@ -153,26 +133,26 @@ def main():
         for k, v in config[key].items():
             setattr(args, k, v)
 
-    # squares = create_board_squares()
+    squares = create_board_squares()
 
     df = pd.read_csv("visualizations\\eval_sample_per_epoch.csv")
     # store labels counts as dict
     # sample names include label (true/pred) and which count it is at
     labels = df['True'].unique()
-    # labels_dict = {}
-    # for i in labels:
-    #     fen = convert_label_to_fen(i, ' ')
-    #     print(fen)
-    #     labels_dict[fen] = 0
-    # for idx in df.index:
-    #     # TRUE
-    #     piece_map = process_raw_input(df['True'][idx], squares)
-    #     create_board_svg(piece_map=piece_map, filename=convert_label_to_fen(df['True'][idx], ' '))
-    #     # PRED
-    #     filename = convert_label_to_fen(df['True'][idx])
-    #     piece_map = process_raw_input(df['Pred'][idx], squares)
-    #     create_board_svg(piece_map=piece_map, filename=f'{filename}({labels_dict[filename]})')
-    #     labels_dict[filename] += 1
+    labels_dict = {}
+    for i in labels:
+        fen = convert_label_to_fen(i, ' ')
+        print(fen)
+        labels_dict[fen] = 0
+    for idx in df.index:
+        # TRUE
+        piece_map = process_raw_input(df['True'][idx], squares)
+        create_board_svg(piece_map=piece_map, filename=convert_label_to_fen(df['True'][idx], ' '))
+        # PRED
+        filename = convert_label_to_fen(df['True'][idx])
+        piece_map = process_raw_input(df['Pred'][idx], squares)
+        create_board_svg(piece_map=piece_map, filename=f'{filename}({labels_dict[filename]})')
+        labels_dict[filename] += 1
     for i in labels:
         create_gif(convert_label_to_fen(i, ' '), 30)
 
